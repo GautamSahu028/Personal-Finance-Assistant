@@ -8,7 +8,7 @@ export default function DashboardLayout({
   return (
     <>
       <nav className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="w-full px-6 py-3 flex items-center justify-between">
           <a href="/dashboard" className="font-semibold">
             Personal Finance Assistant
           </a>
@@ -23,7 +23,7 @@ export default function DashboardLayout({
           </div>
         </div>
       </nav>
-      <main className="max-w-5xl mx-auto">{children}</main>
+      <main className="w-full">{children}</main>
     </>
   );
 }
