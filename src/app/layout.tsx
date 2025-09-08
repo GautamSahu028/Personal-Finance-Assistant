@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { LogoutButton } from "@/components/LogoutButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,15 +20,29 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 min-h-screen`}
       >
-        {children}
+        <nav className="bg-white border-b">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" className="font-semibold">
+              Personal Finance Assistant
+            </a>
+            <div className="space-x-4 text-sm">
+              <a href="/dashboard" className="hover:underline">
+                Dashboard
+              </a>
+              <a href="/transactions" className="hover:underline">
+                Transactions
+              </a>
+              <LogoutButton />
+            </div>
+          </div>
+        </nav>
+        <main className="max-w-5xl mx-auto">{children}</main>
       </body>
     </html>
   );
