@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -9,25 +10,43 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
-  interface HandleSubmitEvent
-    extends React.MouseEvent<HTMLButtonElement, MouseEvent> {}
-
-  function handleSubmit(e: HandleSubmitEvent): void {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    // Simulate login process
-    setTimeout(() => {
-      if (email === "test@example.com" && password === "password") {
-        console.log("Login successful");
-        // router.push("/dashboard");
-      } else {
-        setError("Invalid email or password");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // If backend sent structured error array (Zod or custom)
+        if (Array.isArray(data.error)) {
+          // Show the first error message for now
+          setError(data.error[0].message || "Invalid input");
+        } else if (typeof data.error === "string") {
+          setError(data.error);
+        } else {
+          setError("Something went wrong. Please try again.");
+        }
+        return;
       }
+
+      // Success -> Redirect to dashboard
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Login request failed:", err);
+      setError("Unable to connect. Please try again later.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   }
 
   return (
@@ -48,7 +67,7 @@ export default function LoginPage() {
       ></div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Back to Home Link */}
+        {/* Back to Home */}
         <div className="mb-8">
           <button className="inline-flex items-center text-gray-700 hover:text-blue-600 transition-colors duration-200 group font-medium">
             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
@@ -70,13 +89,14 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Error Box */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
               <p className="text-red-700 text-sm font-medium">{error}</p>
             </div>
           )}
 
-          <div className="space-y-6">
+          <form onSubmit={onSubmit} className="space-y-6">
             {/* Email Field */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -140,9 +160,9 @@ export default function LoginPage() {
 
             {/* Login Button */}
             <button
-              onClick={handleSubmit}
+              type="submit"
               disabled={isLoading}
-              className="w-full hover:cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 disabled:hover:translate-y-0"
+              className="w-full hover:cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-[1.02] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
@@ -153,15 +173,18 @@ export default function LoginPage() {
                 "Sign In"
               )}
             </button>
-          </div>
+          </form>
 
           {/* Register Link */}
           <div className="mt-8 text-center">
             <p className="text-gray-700 font-medium">
               Don't have an account?{" "}
-              <button className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200 hover:underline hover:cursor-pointer">
-                <Link href="/register">Create one here</Link>
-              </button>
+              <Link
+                href="/register"
+                className="text-blue-600 hover:text-blue-800 font-semibold transition-colors duration-200 hover:underline"
+              >
+                Create one here
+              </Link>
             </p>
           </div>
         </div>

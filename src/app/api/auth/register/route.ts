@@ -1,33 +1,59 @@
+// src/app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-
-const RegisterSchema = z.object({
-	email: z.string().email(),
-	password: z.string().min(8),
-	name: z.string().min(1).optional(),
-});
+import { RegisterSchema } from "@/lib/schemas";
+import { formatZodErrors } from "@/utils/formatErrors";
 
 export async function POST(request: Request) {
-	try {
-		const json = await request.json();
-		const { email, password, name } = RegisterSchema.parse(json);
+  try {
+    const json = await request.json();
 
-		const existing = await prisma.user.findUnique({ where: { email } });
-		if (existing) {
-			return NextResponse.json({ error: "Email already registered" }, { status: 409 });
-		}
+    // ✅ Validate request body
+    const { email, password, name } = RegisterSchema.parse(json);
 
-		const passwordHash = await bcrypt.hash(password, 12);
-		const user = await prisma.user.create({ data: { email, passwordHash, name } });
-		return NextResponse.json({ id: user.id, email: user.email, name: user.name });
-	} catch (error: any) {
-		if (error instanceof z.ZodError) {
-			return NextResponse.json({ error: error.flatten() }, { status: 400 });
-		}
-		return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-	}
+    console.log("Register attempt for:", email);
+
+    // ✅ Check for duplicate email
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      console.warn("Register failed: Email already exists", email);
+      return NextResponse.json(
+        { error: [{ field: "email", message: "Email already registered" }] },
+        { status: 409 }
+      );
+    }
+
+    // ✅ Hash password
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    // ✅ Create user
+    const user = await prisma.user.create({
+      data: { email, passwordHash, name },
+    });
+
+    console.log("User registered successfully:", email);
+
+    return NextResponse.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    });
+  } catch (error: any) {
+    // ✅ Zod validation errors
+    if (error instanceof z.ZodError) {
+      const formattedErrors = formatZodErrors(error);
+      console.warn("Register validation error:", formattedErrors);
+
+      return NextResponse.json({ error: formattedErrors }, { status: 400 });
+    }
+
+    // ✅ Unknown errors
+    console.error("Register server error:", error);
+    return NextResponse.json(
+      { error: [{ field: "server", message: "Internal Server Error" }] },
+      { status: 500 }
+    );
+  }
 }
-
-
