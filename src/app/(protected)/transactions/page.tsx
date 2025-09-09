@@ -12,6 +12,10 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [parseResponse, setParseResponse] = useState<any | null>(null);
+  const [importResponse, setImportResponse] = useState<any | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -51,6 +55,90 @@ export default function TransactionsPage() {
       (e.currentTarget as HTMLFormElement).reset();
       setPage(1);
       setFilters({ ...filters });
+    }
+  }
+
+  async function handlePdfUpload(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setParseResponse(null);
+    setImportResponse(null);
+    setLoading(true);
+
+    try {
+      const form = e.currentTarget as HTMLFormElement;
+      const fileInput =
+        form.querySelector<HTMLInputElement>('input[name="file"]');
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        throw new Error("Please select a PDF file to upload.");
+      }
+
+      const file = fileInput.files[0];
+      if (file.type !== "application/pdf") {
+        throw new Error("Only PDF files are supported.");
+      }
+
+      // Step 1: send PDF to parse endpoint
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const parseRes = await fetch("/api/upload/pdf/parse", {
+        method: "POST",
+        body: fd,
+      });
+
+      if (!parseRes.ok) {
+        const txt = await parseRes.text().catch(() => "");
+        const msg = txt || `Parse endpoint failed: ${parseRes.status}`;
+        throw new Error(msg);
+      }
+
+      const parseJson = await parseRes.json().catch(() => null);
+      if (!parseJson || !Array.isArray(parseJson.records)) {
+        throw new Error(
+          "Parse endpoint returned unexpected response. Expected { records: [...] }"
+        );
+      }
+      // save parse response for UI
+      setParseResponse(parseJson);
+
+      // Optionally show a preview/confirm UI here before importing — omitted for brevity.
+
+      // Step 2: POST parsed JSON to import endpoint
+      const importPayload = {
+        count: parseJson.count ?? parseJson.records.length,
+        records: parseJson.records,
+      };
+
+      const importRes = await fetch("/api/upload/pdf/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(importPayload),
+      });
+
+      if (!importRes.ok) {
+        const txt = await importRes.text().catch(() => "");
+        const msg = txt || `Import endpoint failed: ${importRes.status}`;
+        throw new Error(msg);
+      }
+
+      const importJson = await importRes.json().catch(() => null);
+      if (!importJson) {
+        throw new Error("Import endpoint returned invalid JSON");
+      }
+      setImportResponse(importJson);
+
+      // Update filters / UI as you used to
+      setFilters({ ...filters });
+      form.reset();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("PDF upload/import error:", msg, err);
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -284,21 +372,7 @@ export default function TransactionsPage() {
               <h4 className="font-medium text-slate-900">
                 📄 Upload PDF Statement
               </h4>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const fd = new FormData(e.currentTarget as HTMLFormElement);
-                  const res = await fetch("/api/upload/pdf", {
-                    method: "POST",
-                    body: fd,
-                  });
-                  if (res.ok) {
-                    setFilters({ ...filters });
-                    (e.currentTarget as HTMLFormElement).reset();
-                  }
-                }}
-                className="space-y-3"
-              >
+              <form onSubmit={handlePdfUpload} className="space-y-3">
                 <Input
                   name="file"
                   type="file"

@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { redis } from "@/lib/redis";
 
 const SESSION_PREFIX = "session:";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_COOKIE = "pfa_session";
 
 export type SessionData = {
