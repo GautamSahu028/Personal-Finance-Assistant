@@ -20,6 +20,8 @@ The app lets users **track income and expenses, upload and parse bank statements
     - **Bar chart** for category distribution.
     - **Doughnut chart** for expense breakdown.
   - **Date range filter**: 7d, 30d, YTD, or custom.
+  - **Top-N category aggregation**: Dashboard charts fetch only the top N categories (default 10–12) plus an “Others” row per type.
+    - This keeps payloads small and charts readable even with hundreds of categories. A full, paginated category list is available for drill-down.
 
 - 🧾 **Transactions**
 
@@ -245,15 +247,16 @@ src/
 
 ### Dashboard
 
-![Dashboard](public\dashboard.png)
+![Dashboard](screenshots/dashboard.png)
 
 ### Transactions
 
-![Transactions](public\transactions.png)
+![Transactions](screenshots\transaction_add_upload.png)
 
-### Upload
+### Pagination
 
-![Upload](public\upload.png)
+![Pagination-1](screenshots\pagination-1.png)
+![Pagination-2](screenshots\pagination-2.png)
 
 ---
 
@@ -286,16 +289,15 @@ The parser expects each transaction to be on a **single line** in the following 
 
 ### Field Breakdown
 
-* **Date** → `MM/DD/YYYY` (e.g., `9/9/2025`)
-* **Time** → `HH:MM:SS AM/PM` (e.g., `3:51:00 AM`)
-* **Type** → Either `INCOME` or `EXPENSE`
-* **Category** → Single keyword or short tag (e.g., `sharemarket`, `laundary`)
-* **Description** → Free text, may contain hyphens to separate words (e.g., `monthly-salary`, `Sunday-evening-brunch`)
-* **Amount** → Always prefixed with `+` for income or `-` for expense (e.g., `+$12000.00`, `-$200.00`)
+- **Date** → `MM/DD/YYYY` (e.g., `9/9/2025`)
+- **Time** → `HH:MM:SS AM/PM` (e.g., `3:51:00 AM`)
+- **Type** → Either `INCOME` or `EXPENSE`
+- **Category** → Single keyword or short tag (e.g., `sharemarket`, `laundary`)
+- **Description** → Free text, may contain hyphens to separate words (e.g., `monthly-salary`, `Sunday-evening-brunch`)
+- **Amount** → Always prefixed with `+` for income or `-` for expense (e.g., `+$12000.00`, `-$200.00`)
 
 ### Notes
 
-* Each line = one transaction.
-* Parser assumes consistent formatting with commas separating date and time.
-* Amount must include a sign (`+` / `-`) and 2 decimal places.
-
+- Each line = one transaction.
+- Parser assumes consistent formatting with commas separating date and time.
+- Amount must include a sign (`+` / `-`) and 2 decimal places.

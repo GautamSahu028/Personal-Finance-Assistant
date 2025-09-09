@@ -14,7 +14,7 @@ export default function TransactionsPage() {
   const [pageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>({});
   const [loading, setLoading] = useState(false);
-  const [transactionLoading, setTransactionLoading] = useState(true); // New loading state for transactions
+  const [transactionLoading, setTransactionLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [parseResponse, setParseResponse] = useState<any | null>(null);
   const [importResponse, setImportResponse] = useState<any | null>(null);
@@ -30,7 +30,7 @@ export default function TransactionsPage() {
       params.set("start", new Date(filters.start).toISOString());
     if (filters.end) params.set("end", new Date(filters.end).toISOString());
 
-    setTransactionLoading(true); // Set loading to true before fetch
+    setTransactionLoading(true);
 
     fetch(`/api/transactions?${params.toString()}`)
       .then((r) => r.json())
@@ -39,7 +39,7 @@ export default function TransactionsPage() {
         setTotal(d.total || 0);
       })
       .finally(() => {
-        setTransactionLoading(false); // Set loading to false after fetch completes
+        setTransactionLoading(false);
       });
   }, [page, pageSize, filters]);
 
@@ -106,10 +106,7 @@ export default function TransactionsPage() {
           "Parse endpoint returned unexpected response. Expected { records: [...] }"
         );
       }
-      // save parse response for UI
       setParseResponse(parseJson);
-
-      // Optionally show a preview/confirm UI here before importing — omitted for brevity.
 
       // Step 2: POST parsed JSON to import endpoint
       const importPayload = {
@@ -137,7 +134,6 @@ export default function TransactionsPage() {
       }
       setImportResponse(importJson);
 
-      // Update filters / UI as you used to
       setFilters({ ...filters });
       form.reset();
     } catch (err: unknown) {
@@ -209,66 +205,68 @@ export default function TransactionsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Left Column - Forms */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* Add Transaction Form */}
-            <Card
-              title="Add New Transaction"
-              subtitle="Record a new income or expense"
-            >
-              <form onSubmit={onAddSubmit} className="space-y-4">
-                <div className="space-y-4">
-                  <Select label="Transaction Type" name="type" required>
-                    <option value="EXPENSE">💸 Expense</option>
-                    <option value="INCOME">💰 Income</option>
-                  </Select>
+        {/* Top Action Bar - Forms Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Add Transaction Form */}
+          <Card
+            title="Add New Transaction"
+            subtitle="Record a new income or expense"
+          >
+            <form onSubmit={onAddSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select label="Transaction Type" name="type" required>
+                  <option value="EXPENSE">💸 Expense</option>
+                  <option value="INCOME">💰 Income</option>
+                </Select>
 
-                  <Input
-                    label="Amount ($)"
-                    name="amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    required
-                  />
+                <Input
+                  label="Amount ($)"
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
 
-                  <Input
-                    label="Category"
-                    name="category"
-                    placeholder="e.g., Food, Salary, Rent"
-                    required
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Category"
+                  name="category"
+                  placeholder="e.g., Food, Salary, Rent"
+                  required
+                />
 
-                  <Input
-                    label="Description"
-                    name="description"
-                    placeholder="Optional description"
-                  />
+                <Input
+                  label="Date & Time"
+                  name="occurredAt"
+                  type="datetime-local"
+                  required
+                />
+              </div>
 
-                  <Input
-                    label="Date & Time"
-                    name="occurredAt"
-                    type="datetime-local"
-                    required
-                  />
-                </div>
+              <Input
+                label="Description"
+                name="description"
+                placeholder="Optional description"
+              />
 
-                <div className="pt-4 border-t border-gray-200">
-                  <Button type="submit" className="w-full justify-center">
-                    Add Transaction
-                  </Button>
-                </div>
-              </form>
-            </Card>
+              <div className="pt-4 border-t border-gray-200">
+                <Button type="submit" className="w-full justify-center">
+                  Add Transaction
+                </Button>
+              </div>
+            </form>
+          </Card>
 
-            {/* Import Section */}
-            <Card
-              title="Import Transactions"
-              subtitle="Upload PDF statements to extract transactions"
-            >
-              <div className="space-y-4">
-                <div className="text-center p-6 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
+          {/* Import Section */}
+          <Card
+            title="Import Transactions"
+            subtitle="Upload PDF statements to extract transactions"
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center p-6 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 w-full">
                   <div className="text-4xl mb-2">📄</div>
                   <h4 className="font-medium text-slate-900 mb-2">
                     Upload PDF Statement
@@ -307,171 +305,169 @@ export default function TransactionsPage() {
                   )}
                 </div>
               </div>
-            </Card>
-          </div>
-
-          {/* Right Column - Data Display */}
-          <div className="xl:col-span-2 space-y-6">
-            {/* Filters */}
-            <Card
-              title="Filter Transactions"
-              subtitle="Narrow down your search results"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Select
-                  label="Type"
-                  value={filters.type || ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      type: e.target.value || undefined,
-                    }))
-                  }
-                >
-                  <option value="">All Types</option>
-                  <option value="EXPENSE">💸 Expenses</option>
-                  <option value="INCOME">💰 Income</option>
-                </Select>
-
-                <Input
-                  label="Category"
-                  placeholder="Filter by category"
-                  value={filters.category || ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      category: e.target.value || undefined,
-                    }))
-                  }
-                />
-
-                <Input
-                  label="Start Date"
-                  type="date"
-                  value={filters.start || ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      start: e.target.value || undefined,
-                    }))
-                  }
-                />
-
-                <Input
-                  label="End Date"
-                  type="date"
-                  value={filters.end || ""}
-                  onChange={(e) =>
-                    setFilters((f) => ({
-                      ...f,
-                      end: e.target.value || undefined,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="pt-4 border-gray-200 flex justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setFilters({});
-                    setPage(1);
-                  }}
-                  className="px-6"
-                >
-                  🔄 Clear Filters
-                </Button>
-              </div>
-            </Card>
-
-            {/* Transactions Table */}
-            <Card
-              title="Transaction History"
-              subtitle={
-                transactionLoading
-                  ? "Loading transactions..."
-                  : `Showing ${items.length} of ${total} transactions`
-              }
-            >
-              <div className="overflow-hidden">
-                {transactionLoading ? (
-                  <LoadingSpinner />
-                ) : items.length === 0 ? (
-                  <EmptyState />
-                ) : (
-                  <>
-                    <TransactionTable transactions={items} />
-
-                    {/* Professional Pagination */}
-                    {total > 0 && (
-                      <div className="flex flex-col sm:flex-row justify-between items-center mt-6 pt-6 border-t border-gray-200 space-y-3 sm:space-y-0">
-                        <div className="text-sm text-slate-600">
-                          Showing{" "}
-                          <span className="font-medium">
-                            {Math.min((page - 1) * pageSize + 1, total)}
-                          </span>{" "}
-                          to{" "}
-                          <span className="font-medium">
-                            {Math.min(page * pageSize, total)}
-                          </span>{" "}
-                          of <span className="font-medium">{total}</span>{" "}
-                          results
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={page === 1}
-                            onClick={() => setPage((p) => Math.max(1, p - 1))}
-                            className="px-3 py-1.5"
-                          >
-                            ← Previous
-                          </Button>
-
-                          <div className="flex items-center space-x-1">
-                            {Array.from(
-                              { length: Math.min(5, totalPages) },
-                              (_, i) => {
-                                const pageNum = i + 1;
-                                return (
-                                  <button
-                                    key={pageNum}
-                                    onClick={() => setPage(pageNum)}
-                                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                                      page === pageNum
-                                        ? "bg-blue-600 text-white font-medium"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {pageNum}
-                                  </button>
-                                );
-                              }
-                            )}
-                            {totalPages > 5 && (
-                              <span className="text-slate-400 px-2">...</span>
-                            )}
-                          </div>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={page >= totalPages}
-                            onClick={() => setPage((p) => p + 1)}
-                            className="px-3 py-1.5"
-                          >
-                            Next →
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
         </div>
+
+        {/* Filter Section */}
+        <div className="mb-6">
+          <Card
+            title="Filter Transactions"
+            subtitle="Narrow down your search results"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Select
+                label="Type"
+                value={filters.type || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    type: e.target.value || undefined,
+                  }))
+                }
+              >
+                <option value="">All Types</option>
+                <option value="EXPENSE">💸 Expenses</option>
+                <option value="INCOME">💰 Income</option>
+              </Select>
+
+              <Input
+                label="Category"
+                placeholder="Filter by category"
+                value={filters.category || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    category: e.target.value || undefined,
+                  }))
+                }
+              />
+
+              <Input
+                label="Start Date"
+                type="date"
+                value={filters.start || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    start: e.target.value || undefined,
+                  }))
+                }
+              />
+
+              <Input
+                label="End Date"
+                type="date"
+                value={filters.end || ""}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    end: e.target.value || undefined,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="pt-4 border-t border-gray-200 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilters({});
+                  setPage(1);
+                }}
+                className="px-6"
+              >
+                🔄 Clear Filters
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        {/* Transactions Table - Full Width */}
+        <Card
+          title="Transaction History"
+          subtitle={
+            transactionLoading
+              ? "Loading transactions..."
+              : `Showing ${items.length} of ${total} transactions`
+          }
+        >
+          <div className="overflow-hidden">
+            {transactionLoading ? (
+              <LoadingSpinner />
+            ) : items.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <>
+                <TransactionTable transactions={items} />
+
+                {/* Professional Pagination */}
+                {total > 0 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center mt-6 pt-6 border-t border-gray-200 space-y-3 sm:space-y-0">
+                    <div className="text-sm text-slate-600">
+                      Showing{" "}
+                      <span className="font-medium">
+                        {Math.min((page - 1) * pageSize + 1, total)}
+                      </span>{" "}
+                      to{" "}
+                      <span className="font-medium">
+                        {Math.min(page * pageSize, total)}
+                      </span>{" "}
+                      of <span className="font-medium">{total}</span> results
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page === 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        className="px-3 py-1.5"
+                      >
+                        ← Previous
+                      </Button>
+
+                      <div className="flex items-center space-x-1">
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            const pageNum = i + 1;
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setPage(pageNum)}
+                                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                                  page === pageNum
+                                    ? "bg-blue-600 text-white font-medium"
+                                    : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          }
+                        )}
+                        {totalPages > 5 && (
+                          <span className="text-slate-400 px-2">...</span>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                        className="px-3 py-1.5"
+                      >
+                        Next →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </Card>
       </div>
     </div>
   );

@@ -16,21 +16,13 @@ export async function GET(req: Request) {
     const range = url.searchParams.get("range");
     const startParam = url.searchParams.get("start");
     const endParam = url.searchParams.get("end");
+    const topN = Math.max(1, Number(url.searchParams.get("topN") ?? 10)); // default to 10
 
-    console.log("Metrics API called with params:", {
-      range,
-      start: startParam,
-      end: endParam,
-    });
-
-    // Build a date filter object that can contain gte and/or lte
+    // --- Build date filter (same logic you had) ---
     let dateFilter: any = {};
-
-    // Case A: Predefined range (like "7d", "30d", etc.)
     if (range && range !== "custom") {
-      dateFilter = buildDateRange(range); // recommended to return { occurredAt: { gte, lte } }
+      dateFilter = buildDateRange(range);
     } else if (startParam || endParam) {
-      // Case B: custom start / end params provided by client
       const parseDateSafe = (s?: string | null) => {
         if (!s) return null;
         const d = new Date(s);
@@ -40,7 +32,6 @@ export async function GET(req: Request) {
 
       const startDate = parseDateSafe(startParam);
       const rawEndDate = parseDateSafe(endParam);
-      // make lte inclusive by bumping end to end-of-day if present
       const endDate = rawEndDate
         ? new Date(rawEndDate.setHours(23, 59, 59, 999))
         : null;
@@ -55,97 +46,200 @@ export async function GET(req: Request) {
         dateFilter = {};
       }
     } else {
-      // No date filter at all (fetch all time)
       dateFilter = {};
     }
 
-    console.log("Computed dateFilter:", dateFilter);
+    const hasRange = !!dateFilter.occurredAt;
+    const gte = hasRange ? dateFilter.occurredAt.gte : null;
+    const lte = hasRange ? dateFilter.occurredAt.lte : null;
 
-    // Build a safe `where` object for Prisma calls
-    const where: any = { userId };
-    if (dateFilter.occurredAt) {
-      where.occurredAt = dateFilter.occurredAt;
+    // --- 1) Fetch top N categories by sum(amountCents) ---
+    let topCategoriesRaw: Array<{
+      category: string;
+      type: string;
+      amountcents: bigint | number;
+    }> = [];
+
+    if (hasRange && gte && lte) {
+      topCategoriesRaw = await prisma.$queryRaw<
+        Array<{ category: string; type: string; amountcents: bigint | number }>
+      >`SELECT "category", CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" BETWEEN ${gte} AND ${lte}
+          GROUP BY "category", type
+          ORDER BY SUM("amountCents") DESC
+          LIMIT ${topN}`;
+    } else if (hasRange && gte) {
+      topCategoriesRaw = await prisma.$queryRaw<
+        Array<{ category: string; type: string; amountcents: bigint | number }>
+      >`SELECT "category", CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" >= ${gte}
+          GROUP BY "category", type
+          ORDER BY SUM("amountCents") DESC
+          LIMIT ${topN}`;
+    } else if (hasRange && lte) {
+      topCategoriesRaw = await prisma.$queryRaw<
+        Array<{ category: string; type: string; amountcents: bigint | number }>
+      >`SELECT "category", CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" <= ${lte}
+          GROUP BY "category", type
+          ORDER BY SUM("amountCents") DESC
+          LIMIT ${topN}`;
+    } else {
+      topCategoriesRaw = await prisma.$queryRaw<
+        Array<{ category: string; type: string; amountcents: bigint | number }>
+      >`SELECT "category", CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+          GROUP BY "category", type
+          ORDER BY SUM("amountCents") DESC
+          LIMIT ${topN}`;
     }
 
-    // byCategory using Prisma groupBy
-    const byCategoryRaw = await prisma.transaction.groupBy({
-      by: ["category", "type"],
-      where,
-      _sum: { amountCents: true },
+    const topCategories = topCategoriesRaw.map((r) => ({
+      category: r.category,
+      type: r.type,
+      _sum: { amountCents: Number(r.amountcents ?? 0) },
+    }));
+
+    // --- 2) Total sum per type (to compute Others = total - topSum) ---
+    let totalByTypeRaw: Array<{ type: string; amountcents: bigint | number }> =
+      [];
+
+    if (hasRange && gte && lte) {
+      totalByTypeRaw = await prisma.$queryRaw<
+        Array<{ type: string; amountcents: bigint | number }>
+      >`SELECT CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" BETWEEN ${gte} AND ${lte}
+          GROUP BY type`;
+    } else if (hasRange && gte) {
+      totalByTypeRaw = await prisma.$queryRaw<
+        Array<{ type: string; amountcents: bigint | number }>
+      >`SELECT CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" >= ${gte}
+          GROUP BY type`;
+    } else if (hasRange && lte) {
+      totalByTypeRaw = await prisma.$queryRaw<
+        Array<{ type: string; amountcents: bigint | number }>
+      >`SELECT CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+            AND "occurredAt" <= ${lte}
+          GROUP BY type`;
+    } else {
+      totalByTypeRaw = await prisma.$queryRaw<
+        Array<{ type: string; amountcents: bigint | number }>
+      >`SELECT CAST(type AS text) as type, SUM("amountCents") as amountcents
+          FROM "Transaction"
+          WHERE "userId" = ${userId}
+          GROUP BY type`;
+    }
+
+    const totalByType = totalByTypeRaw.reduce(
+      (acc: Record<string, number>, r) => {
+        acc[r.type] = Number(r.amountcents ?? 0);
+        return acc;
+      },
+      {}
+    );
+
+    // Sum of topN grouped by type
+    const topSumsByType = topCategories.reduce(
+      (acc: Record<string, number>, r) => {
+        acc[r.type] = (acc[r.type] || 0) + (r._sum?.amountCents || 0);
+        return acc;
+      },
+      {}
+    );
+
+    // Compute Others per type
+    const others: Array<{ type: string; amountcents: number }> = Object.keys(
+      totalByType
+    ).map((type) => {
+      const othersAmount = Math.max(
+        0,
+        totalByType[type] - (topSumsByType[type] || 0)
+      );
+      return { type, amountcents: othersAmount };
     });
 
-    // byDay aggregation using raw SQL with explicit branches depending on available bounds
+    // Build final byCategory array: top categories + "Others" rows
+    const byCategory = [
+      ...topCategories,
+      ...others
+        .filter((o) => o.amountcents > 0)
+        .map((o) => ({
+          category: "Others",
+          type: o.type,
+          _sum: { amountCents: Number(o.amountcents) },
+        })),
+    ];
+
+    // --- byDay aggregation (explicit branches, same pattern) ---
     let byDayRaw: Array<{ day: string; type: string; amountcents: number }> =
       [];
 
-    const occurredAt = dateFilter.occurredAt || null;
-    if (occurredAt && occurredAt.gte && occurredAt.lte) {
+    if (hasRange && gte && lte) {
       byDayRaw = await prisma.$queryRaw<
         Array<{ day: string; type: string; amountcents: number }>
-      >`
-        SELECT DATE("occurredAt") as day,
+      >`SELECT DATE("occurredAt") as day,
                CAST(type AS text) as type,
                SUM("amountCents") as amountcents
         FROM "Transaction"
         WHERE "userId" = ${userId}
-          AND "occurredAt" BETWEEN ${occurredAt.gte} AND ${occurredAt.lte}
+          AND "occurredAt" BETWEEN ${gte} AND ${lte}
         GROUP BY day, type
-        ORDER BY day ASC
-      `;
-    } else if (occurredAt && occurredAt.gte) {
+        ORDER BY day ASC`;
+    } else if (hasRange && gte) {
       byDayRaw = await prisma.$queryRaw<
         Array<{ day: string; type: string; amountcents: number }>
-      >`
-        SELECT DATE("occurredAt") as day,
+      >`SELECT DATE("occurredAt") as day,
                CAST(type AS text) as type,
                SUM("amountCents") as amountcents
         FROM "Transaction"
         WHERE "userId" = ${userId}
-          AND "occurredAt" >= ${occurredAt.gte}
+          AND "occurredAt" >= ${gte}
         GROUP BY day, type
-        ORDER BY day ASC
-      `;
-    } else if (occurredAt && occurredAt.lte) {
+        ORDER BY day ASC`;
+    } else if (hasRange && lte) {
       byDayRaw = await prisma.$queryRaw<
         Array<{ day: string; type: string; amountcents: number }>
-      >`
-        SELECT DATE("occurredAt") as day,
+      >`SELECT DATE("occurredAt") as day,
                CAST(type AS text) as type,
                SUM("amountCents") as amountcents
         FROM "Transaction"
         WHERE "userId" = ${userId}
-          AND "occurredAt" <= ${occurredAt.lte}
+          AND "occurredAt" <= ${lte}
         GROUP BY day, type
-        ORDER BY day ASC
-      `;
+        ORDER BY day ASC`;
     } else {
       byDayRaw = await prisma.$queryRaw<
         Array<{ day: string; type: string; amountcents: number }>
-      >`
-        SELECT DATE("occurredAt") as day,
+      >`SELECT DATE("occurredAt") as day,
                CAST(type AS text) as type,
                SUM("amountCents") as amountcents
         FROM "Transaction"
         WHERE "userId" = ${userId}
         GROUP BY day, type
-        ORDER BY day ASC
-      `;
+        ORDER BY day ASC`;
     }
 
-    // Normalize/convert numeric/bigint values to numbers for JSON
-    const byCategory = byCategoryRaw.map((r) => ({
-      category: r.category,
-      type: r.type,
-      _sum: { amountCents: Number(r._sum?.amountCents ?? 0) },
-    }));
-
-    const byDay = byDayRaw.map((r) => ({
+    const normalizedByDay = byDayRaw.map((r) => ({
       day: r.day,
       type: r.type,
       amountcents: Number(r.amountcents ?? 0),
     }));
 
-    return NextResponse.json({ byCategory, byDay });
+    return NextResponse.json({ byCategory, byDay: normalizedByDay });
   } catch (err) {
     console.error("Metrics API error:", err);
     return NextResponse.json(
