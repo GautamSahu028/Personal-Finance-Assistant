@@ -268,3 +268,34 @@ src/
   datasets.
 
 ---
+
+## 📄 Expected PDF Transaction Format
+
+The parser expects each transaction to be on a **single line** in the following structure:
+
+```
+<Date>, <Time> <Type> <Category> <Description> <Amount>
+```
+
+### Example
+
+```
+9/9/2025, 3:51:00 AM INCOME sharemarket monthly-salary +$12000.00
+9/7/2025, 1:32:00 AM EXPENSE laundary Sunday-evening-brunch -$200.00
+```
+
+### Field Breakdown
+
+* **Date** → `MM/DD/YYYY` (e.g., `9/9/2025`)
+* **Time** → `HH:MM:SS AM/PM` (e.g., `3:51:00 AM`)
+* **Type** → Either `INCOME` or `EXPENSE`
+* **Category** → Single keyword or short tag (e.g., `sharemarket`, `laundary`)
+* **Description** → Free text, may contain hyphens to separate words (e.g., `monthly-salary`, `Sunday-evening-brunch`)
+* **Amount** → Always prefixed with `+` for income or `-` for expense (e.g., `+$12000.00`, `-$200.00`)
+
+### Notes
+
+* Each line = one transaction.
+* Parser assumes consistent formatting with commas separating date and time.
+* Amount must include a sign (`+` / `-`) and 2 decimal places.
+
