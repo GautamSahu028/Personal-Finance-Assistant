@@ -251,12 +251,12 @@ src/
 
 ### Transactions
 
-![Transactions](screenshots\transaction_add_upload.png)
+![Transactions](screenshots/transaction_add_upload.png)
 
 ### Pagination
 
-![Pagination-1](screenshots\pagination-1.png)
-![Pagination-2](screenshots\pagination-2.png)
+![Pagination-1](screenshots/pagination-1.png)
+![Pagination-2](screenshots/pagination-2.png)
 
 ---
 
