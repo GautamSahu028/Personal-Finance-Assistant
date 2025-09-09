@@ -204,7 +204,6 @@ src/
 ### Upload
 
 - `POST /api/upload/pdf` — parse bank statement PDF.
-- `POST /api/upload/receipt` — parse receipt.
 
 ---
 
