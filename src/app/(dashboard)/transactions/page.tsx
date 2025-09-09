@@ -1,27 +1,17 @@
 "use client";
+import { Button } from "@/components/transaction/Button";
+import { Card } from "@/components/transaction/Card";
+import { Input } from "@/components/transaction/Input";
+import { Select } from "@/components/transaction/Select";
+import { TransactionTable } from "@/components/transaction/TransactionTable";
 import { useEffect, useState } from "react";
-
-type Tx = {
-  id: string;
-  type: "INCOME" | "EXPENSE";
-  amountCents: number;
-  currency: string;
-  category: string;
-  description?: string;
-  occurredAt: string;
-};
 
 export default function TransactionsPage() {
   const [items, setItems] = useState<Tx[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
-  const [filters, setFilters] = useState<{
-    type?: string;
-    category?: string;
-    start?: string;
-    end?: string;
-  }>({});
+  const [filters, setFilters] = useState<Filters>({});
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -33,6 +23,7 @@ export default function TransactionsPage() {
     if (filters.start)
       params.set("start", new Date(filters.start).toISOString());
     if (filters.end) params.set("end", new Date(filters.end).toISOString());
+
     fetch(`/api/transactions?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => {
@@ -63,204 +54,269 @@ export default function TransactionsPage() {
     }
   }
 
+  const totalPages = Math.ceil(total / pageSize);
+
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Transactions</h1>
-      <div className="bg-white p-4 rounded shadow">
-        <form
-          onSubmit={onAddSubmit}
-          className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end"
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="w-full px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
+                Transactions
+              </h1>
+              <p className="mt-2 text-slate-600">
+                Manage and track all your financial transactions
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-slate-500 uppercase tracking-wide font-medium mb-1">
+                Total Records
+              </div>
+              <div className="text-2xl font-semibold text-slate-900">
+                {total.toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full px-6 lg:px-8 py-8 space-y-8">
+        {/* Add Transaction Form */}
+        <Card
+          title="Add New Transaction"
+          subtitle="Record a new income or expense"
         >
-          <div>
-            <label className="block text-sm mb-1">Type</label>
-            <select name="type" className="border rounded px-2 py-2 w-full">
-              <option value="EXPENSE">Expense</option>
-              <option value="INCOME">Income</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Amount</label>
-            <input
-              name="amount"
-              type="number"
-              step="0.01"
-              className="border rounded px-2 py-2 w-full"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Category</label>
-            <input
-              name="category"
-              className="border rounded px-2 py-2 w-full"
-              required
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm mb-1">Description</label>
-            <input
-              name="description"
-              className="border rounded px-2 py-2 w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Date</label>
-            <input
-              name="occurredAt"
-              type="datetime-local"
-              className="border rounded px-2 py-2 w-full"
-              required
-            />
-          </div>
-          <div className="md:col-span-6">
-            <button className="bg-blue-600 text-white px-4 py-2 rounded">
-              Add
-            </button>
-          </div>
-        </form>
-      </div>
+          <form onSubmit={onAddSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Select label="Transaction Type" name="type" required>
+                <option value="EXPENSE">💸 Expense</option>
+                <option value="INCOME">💰 Income</option>
+              </Select>
 
-      <div className="bg-white p-4 rounded shadow">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-          <select
-            value={filters.type || ""}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, type: e.target.value || undefined }))
-            }
-            className="border rounded px-2 py-2"
-          >
-            <option value="">All types</option>
-            <option value="EXPENSE">Expense</option>
-            <option value="INCOME">Income</option>
-          </select>
-          <input
-            placeholder="Category"
-            value={filters.category || ""}
-            onChange={(e) =>
-              setFilters((f) => ({
-                ...f,
-                category: e.target.value || undefined,
-              }))
-            }
-            className="border rounded px-2 py-2"
-          />
-          <input
-            type="date"
-            value={filters.start || ""}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, start: e.target.value || undefined }))
-            }
-            className="border rounded px-2 py-2"
-          />
-          <input
-            type="date"
-            value={filters.end || ""}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, end: e.target.value || undefined }))
-            }
-            className="border rounded px-2 py-2"
-          />
-          <button
-            onClick={() => setPage(1)}
-            className="bg-gray-100 border rounded px-3 py-2"
-          >
-            Filter
-          </button>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-2">Date</th>
-              <th>Type</th>
-              <th>Category</th>
-              <th>Description</th>
-              <th className="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((tx) => (
-              <tr key={tx.id} className="border-b">
-                <td className="py-2">
-                  {new Date(tx.occurredAt).toLocaleString()}
-                </td>
-                <td>{tx.type}</td>
-                <td>{tx.category}</td>
-                <td>{tx.description || "-"}</td>
-                <td className="text-right">
-                  {tx.type === "EXPENSE" ? "-" : "+"}$
-                  {(tx.amountCents / 100).toFixed(2)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex justify-between items-center mt-4">
-          <span className="text-sm text-gray-600">Total: {total}</span>
-          <div className="space-x-2">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Prev
-            </button>
-            <button
-              disabled={page * pageSize >= total}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 border rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
+              <Input
+                label="Amount ($)"
+                name="amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+              />
 
-      <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-medium mb-2">Import</h2>
-        <div className="flex gap-4">
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget as HTMLFormElement);
-              const res = await fetch("/api/upload/receipt", {
-                method: "POST",
-                body: fd,
-              });
-              if (res.ok) setFilters({ ...filters });
-            }}
-          >
-            <input
-              name="file"
-              type="file"
-              accept="image/*,application/pdf"
-              className="border rounded px-2 py-2"
-            />
-            <button className="ml-2 bg-gray-800 text-white px-3 py-2 rounded">
-              Upload Receipt
-            </button>
+              <Input
+                label="Category"
+                name="category"
+                placeholder="e.g., Food, Salary, Rent"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Description"
+                name="description"
+                placeholder="Optional description"
+              />
+
+              <Input
+                label="Date & Time"
+                name="occurredAt"
+                type="datetime-local"
+                required
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit">➕ Add Transaction</Button>
+            </div>
           </form>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget as HTMLFormElement);
-              const res = await fetch("/api/upload/pdf", {
-                method: "POST",
-                body: fd,
-              });
-              if (res.ok) setFilters({ ...filters });
-            }}
-          >
-            <input
-              name="file"
-              type="file"
-              accept="application/pdf"
-              className="border rounded px-2 py-2"
+        </Card>
+
+        {/* Filters */}
+        <Card
+          title="Filter Transactions"
+          subtitle="Narrow down your search results"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Select
+              label="Type"
+              value={filters.type || ""}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, type: e.target.value || undefined }))
+              }
+            >
+              <option value="">All Types</option>
+              <option value="EXPENSE">💸 Expenses</option>
+              <option value="INCOME">💰 Income</option>
+            </Select>
+
+            <Input
+              label="Category"
+              placeholder="Filter by category"
+              value={filters.category || ""}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  category: e.target.value || undefined,
+                }))
+              }
             />
-            <button className="ml-2 bg-gray-800 text-white px-3 py-2 rounded">
-              Upload PDF
-            </button>
-          </form>
-        </div>
+
+            <Input
+              label="Start Date"
+              type="date"
+              value={filters.start || ""}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  start: e.target.value || undefined,
+                }))
+              }
+            />
+
+            <Input
+              label="End Date"
+              type="date"
+              value={filters.end || ""}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, end: e.target.value || undefined }))
+              }
+            />
+
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFilters({});
+                  setPage(1);
+                }}
+                className="w-full"
+              >
+                🔄 Clear Filters
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Transactions Table */}
+        <Card
+          title="Transaction History"
+          subtitle={`Showing ${items.length} of ${total} transactions`}
+        >
+          <TransactionTable transactions={items} />
+
+          {/* Pagination */}
+          {total > 0 && (
+            <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+              <div className="text-sm text-slate-600">
+                Showing {Math.min((page - 1) * pageSize + 1, total)} to{" "}
+                {Math.min(page * pageSize, total)} of {total} results
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Previous
+                </Button>
+                <span className="px-3 py-1.5 text-sm text-slate-600">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next →
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Import Section */}
+        <Card
+          title="Import Transactions"
+          subtitle="Upload receipts or PDF statements to automatically extract transactions"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Receipt Upload */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-slate-900">📷 Upload Receipt</h4>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget as HTMLFormElement);
+                  const res = await fetch("/api/upload/receipt", {
+                    method: "POST",
+                    body: fd,
+                  });
+                  if (res.ok) {
+                    setFilters({ ...filters });
+                    (e.currentTarget as HTMLFormElement).reset();
+                  }
+                }}
+                className="space-y-3"
+              >
+                <Input
+                  name="file"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  required
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="w-full bg-slate-500 py-2 hover:bg-slate-600 hover:cursor-pointer"
+                  disabled={false}
+                >
+                  📤 Upload Receipt
+                </Button>
+              </form>
+            </div>
+
+            {/* PDF Upload */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-slate-900">
+                📄 Upload PDF Statement
+              </h4>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget as HTMLFormElement);
+                  const res = await fetch("/api/upload/pdf", {
+                    method: "POST",
+                    body: fd,
+                  });
+                  if (res.ok) {
+                    setFilters({ ...filters });
+                    (e.currentTarget as HTMLFormElement).reset();
+                  }
+                }}
+                className="space-y-3"
+              >
+                <Input
+                  name="file"
+                  type="file"
+                  accept="application/pdf"
+                  required
+                />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  className="w-full bg-slate-500 py-2 hover:bg-slate-600 hover:cursor-pointer"
+                  disabled={false}
+                >
+                  📤 Upload PDF
+                </Button>
+              </form>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

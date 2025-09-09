@@ -1,6 +1,6 @@
 // src/app/(dashboard)/dashboard/page.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -16,6 +16,8 @@ import { ChartCard } from "@/components/dashboard/ChartCard";
 import { BalanceIcon, ExpenseIcon, IncomeIcon } from "@/components/Icons";
 import { generateColors } from "@/utils/generateColors";
 import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
+import { useDebounced } from "@/hooks/useDebounced";
+import { useMetrics } from "@/hooks/useMetric";
 
 ChartJS.register(
   ArcElement,
@@ -27,126 +29,128 @@ ChartJS.register(
 );
 
 export default function DashboardPage() {
-  const [data, setData] = useState<any>(null);
-  const [range, setRange] = useState("30d"); // default
+  // --- top-level state hooks (always run) ---
+  const [range, setRange] = useState("30d");
   const [customRange, setCustomRange] = useState<{
     start?: string;
     end?: string;
   }>({});
-  const [isFetching, setIsFetching] = useState(false);
 
-  useEffect(() => {
-    // If custom selected but dates incomplete, DON'T fetch and don't wipe current data.
-    if (range === "custom" && !(customRange.start && customRange.end)) {
-      console.log(
-        "Custom range selected but start/end missing — skipping fetch"
-      );
-      return;
-    }
+  // debounced copy of customRange (hook also always runs)
+  const debouncedCustom = useDebounced(customRange, 500);
 
-    // Build params safely
-    const params = new URLSearchParams();
-    if (range !== "custom") {
-      params.set("range", range);
-    } else {
-      params.set("start", customRange.start!);
-      params.set("end", customRange.end!);
-    }
-    const url = `/api/metrics?${params.toString()}`;
-    console.log("Fetching data from:", url);
+  // Decide whether to include customRange in query params
+  // (calculation is not a hook; it's safe)
+  const shouldFetchCustom =
+    range !== "custom" || (debouncedCustom.start && debouncedCustom.end);
 
-    setIsFetching(true);
-    fetch(url)
-      .then((r) => {
-        if (!r.ok) throw new Error("Network response not ok");
-        return r.json();
-      })
-      .then((json) => setData(json))
-      .catch((err) => {
-        console.error("Metrics fetch failed:", err);
-        // keep previous data instead of clearing it (better UX)
-      })
-      .finally(() => setIsFetching(false));
-  }, [range, customRange]);
-
-  // Show spinner only while actively fetching. If user selected custom and hasn't picked dates,
-  // the effect returned early and `data` remains whatever it was (no spinner).
-  if (isFetching && !data) {
-    // initial load fallback
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-12 h-12 border-3 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-lg text-slate-600 font-medium">
-              Loading analytics...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // If user selected custom but hasn't chosen both dates, show a gentle message (and keep previous data)
-  if (range === "custom" && !(customRange.start && customRange.end) && data) {
-    // we render the dashboard normally (using previous `data`) but show a small hint in header
-    // (we'll let the rest of the UI render using existing `data`)
-  }
-
-  // If still no data at all (first load failed), show fallback
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="w-12 h-12 border-3 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-lg text-slate-600 font-medium">
-              Loading analytics...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- existing rendering logic (unchanged) ---
-  const byCategory = data.byCategory || [];
-  const catLabels: string[] = Array.from(
-    new Set(
-      byCategory
-        .filter((x: any) => x.type === "EXPENSE")
-        .map((x: any) => x.category)
-    )
-  );
-  const catValues = catLabels.map((c) => {
-    const sum = byCategory
-      .filter((x: any) => x.category === c && x.type === "EXPENSE")
-      .reduce((a: number, b: any) => a + (b._sum?.amountCents || 0), 0);
-    return Math.round(sum / 100);
-  });
-
-  const byDay = data.byDay || [];
-  const dayLabels: string[] = Array.from(new Set(byDay.map((x: any) => x.day)));
-  const expenseSeries = dayLabels.map((d) =>
-    Math.round(
-      (byDay.find((x: any) => x.day === d && x.type === "EXPENSE")
-        ?.amountcents || 0) / 100
-    )
-  );
-  const incomeSeries = dayLabels.map((d) =>
-    Math.round(
-      (byDay.find((x: any) => x.day === d && x.type === "INCOME")
-        ?.amountcents || 0) / 100
-    )
+  // Query hook (always runs)
+  const { data, isLoading, isError, error, refetch, isFetching } = useMetrics(
+    range,
+    shouldFetchCustom ? debouncedCustom : undefined
   );
 
-  const totalIncome = incomeSeries.reduce((a, b) => a + b, 0);
-  const totalExpenses = expenseSeries.reduce((a, b) => a + b, 0);
+  // --- derived values via useMemo (always run in same order) ---
+  const byCategory = data?.byCategory || [];
+  const catLabels = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          byCategory
+            .filter((x: any) => x.type === "EXPENSE")
+            .map((x: any) => x.category)
+        )
+      ),
+    [byCategory]
+  );
+  const catValues = useMemo(
+    () =>
+      catLabels.map((c) =>
+        Math.round(
+          byCategory
+            .filter((x: any) => x.category === c && x.type === "EXPENSE")
+            .reduce((a: number, b: any) => a + (b._sum?.amountCents || 0), 0) /
+            100
+        )
+      ),
+    [byCategory, catLabels]
+  );
+
+  const byDay = data?.byDay || [];
+  const dayLabels = useMemo(
+    () => Array.from(new Set(byDay.map((x: any) => x.day))),
+    [byDay]
+  );
+  const expenseSeries = useMemo(
+    () =>
+      dayLabels.map((d) =>
+        Math.round(
+          (byDay.find((x: any) => x.day === d && x.type === "EXPENSE")
+            ?.amountcents || 0) / 100
+        )
+      ),
+    [byDay, dayLabels]
+  );
+  const incomeSeries = useMemo(
+    () =>
+      dayLabels.map((d) =>
+        Math.round(
+          (byDay.find((x: any) => x.day === d && x.type === "INCOME")
+            ?.amountcents || 0) / 100
+        )
+      ),
+    [byDay, dayLabels]
+  );
+
+  const totalIncome = useMemo(
+    () => incomeSeries.reduce((a, b) => a + b, 0),
+    [incomeSeries]
+  );
+  const totalExpenses = useMemo(
+    () => expenseSeries.reduce((a, b) => a + b, 0),
+    [expenseSeries]
+  );
   const netBalance = totalIncome - totalExpenses;
 
+  // --- conditional rendering using already-declared hooks ---
+  if (isLoading && !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-3 border-slate-300 border-t-slate-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-lg text-slate-600 font-medium">
+            Loading analytics...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError && !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center p-6 bg-white rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2">Unable to load metrics</h3>
+          <p className="text-sm text-slate-600 mb-4">
+            {error?.message || "Something went wrong."}
+          </p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main dashboard UI (data may be placeholderData while fetching, that's fine)
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="w-full px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between">
@@ -158,14 +162,8 @@ export default function DashboardPage() {
                 Comprehensive analysis of your financial performance
               </p>
             </div>
-            <DateRangeFilter
-              value={range}
-              onChange={(val, custom) => {
-                setRange(val);
-                if (custom) setCustomRange(custom);
-              }}
-            />
 
+            {/* Last updated info only */}
             <div className="text-right">
               <div className="text-sm text-slate-500 uppercase tracking-wide font-medium mb-1">
                 Last Updated
@@ -179,16 +177,43 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          {/* If custom selected but dates missing, show a subtle hint */}
+        </div>
+      </div>
+
+      {/* Filter Panel */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="w-full px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="text-sm font-medium text-slate-700">
+                Filter by date range:
+              </div>
+              <DateRangeFilter
+                value={range}
+                onChange={(val, custom) => {
+                  setRange(val);
+                  if (custom) setCustomRange(custom);
+                }}
+              />
+            </div>
+
+            {isFetching && (
+              <div className="flex items-center text-sm text-slate-500">
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin mr-2"></div>
+                Updating data…
+              </div>
+            )}
+          </div>
+
           {range === "custom" && !(customRange.start && customRange.end) && (
-            <div className="mt-3 text-sm text-amber-600">
+            <div className="mt-3 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-md">
               Select start and end dates to load the custom range.
             </div>
           )}
         </div>
       </div>
 
-      {/* Key Metrics Section */}
+      {/* Metrics */}
       <div className="w-full px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <MetricCard
@@ -198,7 +223,6 @@ export default function DashboardPage() {
             iconBgColor="bg-emerald-100"
             iconColor="text-emerald-600"
           />
-
           <MetricCard
             title="Total Expenses"
             value={`$${totalExpenses.toLocaleString()}`}
@@ -206,7 +230,6 @@ export default function DashboardPage() {
             iconBgColor="bg-red-100"
             iconColor="text-red-600"
           />
-
           <MetricCard
             title="Net Balance"
             value={`$${Math.abs(netBalance).toLocaleString()}`}
@@ -218,9 +241,8 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Charts Section */}
+        {/* Charts */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Expenses by Category Chart */}
           <ChartCard
             title="Expense Distribution"
             subtitle="Breakdown by category"
@@ -249,7 +271,7 @@ export default function DashboardPage() {
                         font: {
                           size: 13,
                           weight: 500,
-                          family: "system-ui, -apple-system, sans-serif",
+                          family: "system-ui, sans-serif",
                         },
                         color: "#475569",
                         usePointStyle: true,
@@ -257,17 +279,12 @@ export default function DashboardPage() {
                       },
                     },
                     tooltip: {
-                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      backgroundColor: "rgba(15,23,42,0.9)",
                       titleColor: "#f1f5f9",
                       bodyColor: "#f1f5f9",
                       cornerRadius: 8,
-                      titleFont: {
-                        size: 14,
-                        weight: 600,
-                      },
-                      bodyFont: {
-                        size: 13,
-                      },
+                      titleFont: { size: 14, weight: 600 },
+                      bodyFont: { size: 13 },
                     },
                   },
                   maintainAspectRatio: false,
@@ -277,7 +294,6 @@ export default function DashboardPage() {
             </div>
           </ChartCard>
 
-          {/* Income vs Expense Chart */}
           <ChartCard
             title="Cash Flow Analysis"
             subtitle="Daily income vs expenses"
@@ -290,8 +306,8 @@ export default function DashboardPage() {
                     {
                       label: "Expenses",
                       data: expenseSeries,
-                      backgroundColor: "rgba(244, 63, 94, 0.7)", // rose-500 with transparency
-                      borderColor: "#be123c", // rose-700
+                      backgroundColor: "rgba(244,63,94,0.7)",
+                      borderColor: "#be123c",
                       borderWidth: 1,
                       borderRadius: 4,
                       borderSkipped: false,
@@ -299,8 +315,8 @@ export default function DashboardPage() {
                     {
                       label: "Income",
                       data: incomeSeries,
-                      backgroundColor: "rgba(16, 185, 129, 0.7)", // emerald-500 with transparency
-                      borderColor: "#065f46", // emerald-800
+                      backgroundColor: "rgba(16,185,129,0.7)",
+                      borderColor: "#065f46",
                       borderWidth: 1,
                       borderRadius: 4,
                       borderSkipped: false,
@@ -318,7 +334,7 @@ export default function DashboardPage() {
                         font: {
                           size: 13,
                           weight: 500,
-                          family: "system-ui, -apple-system, sans-serif",
+                          family: "system-ui, sans-serif",
                         },
                         color: "#475569",
                         usePointStyle: true,
@@ -326,52 +342,31 @@ export default function DashboardPage() {
                       },
                     },
                     tooltip: {
-                      backgroundColor: "rgba(15, 23, 42, 0.9)",
+                      backgroundColor: "rgba(15,23,42,0.9)",
                       titleColor: "#f1f5f9",
                       bodyColor: "#f1f5f9",
                       cornerRadius: 8,
-                      titleFont: {
-                        size: 14,
-                        weight: 600,
-                      },
-                      bodyFont: {
-                        size: 13,
-                      },
+                      titleFont: { size: 14, weight: 600 },
+                      bodyFont: { size: 13 },
                     },
                   },
                   scales: {
                     x: {
-                      grid: {
-                        display: false,
-                      },
+                      grid: { display: false },
                       ticks: {
-                        font: {
-                          size: 12,
-                          weight: 500,
-                        },
+                        font: { size: 12, weight: 500 },
                         color: "#64748b",
                       },
-                      border: {
-                        color: "#e2e8f0",
-                      },
+                      border: { color: "#e2e8f0" },
                     },
                     y: {
-                      grid: {
-                        color: "#f1f5f9",
-                      },
+                      grid: { color: "#f1f5f9" },
                       ticks: {
-                        font: {
-                          size: 12,
-                          weight: 500,
-                        },
+                        font: { size: 12, weight: 500 },
                         color: "#64748b",
-                        callback: function (value) {
-                          return "$" + value;
-                        },
+                        callback: (value) => "$" + value,
                       },
-                      border: {
-                        display: false,
-                      },
+                      border: { display: false },
                     },
                   },
                 }}
