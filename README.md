@@ -86,12 +86,13 @@ src/
  │   │   ├── dashboard/page.tsx         # Dashboard with charts & metrics
  │   │   └── transactions/page.tsx      # Transaction management
  │   ├── (public)/                      # Landing, Login & Register pages
- │   ├── api/
- │   │   ├── auth/                      # Auth endpoints (login, register, logout, me)
- │   │   ├── metrics/route.ts           # Metrics aggregation
- │   │   ├── transactions/route.ts      # Transactions CRUD
- │   │   └── upload/                    # PDF & receipt parsing
- │   └── page.tsx                       # Landing page
+ │   └── api/
+ │       ├── auth/                      # Auth endpoints (login, register, logout, me)
+ │       ├── metrics/route.ts           # Metrics aggregation
+ │       ├── transactions/route.ts      # Transactions CRUD
+ │       └── upload/                    # PDF upload logic
+ |           ├── import/route.ts        # upload transaction history from pdf to db
+ |           └── parse/route.ts         # PDF to JSON using google/flan-t5-small LLM
  ├── components/                        # Reusable UI components (cards, filters, inputs, etc.)
  ├── hooks/
  │   ├── useDebounced.ts                # Custom hook for debouncing state values (reduces noisy API requests)
@@ -223,8 +224,8 @@ src/
 3. **Create `.env`**
 
    ```env
-   DATABASE_URL="postgresql://user:password@localhost:5432/finance"
-   REDIS_URL="redis://localhost:6379"
+   DATABASE_URL=<your_db_url>
+   REDIS_URL=<your_redis_https_url>
    ```
 
 4. **Database setup**
@@ -244,15 +245,15 @@ src/
 
 ### Dashboard
 
-![Dashboard](./screenshots/4975c1c6-a166-4212-9433-301434f2b062.png)
+![Dashboard](public\dashboard.png)
 
 ### Transactions
 
-![Transactions](./screenshots/ffc46e9e-8294-4f25-8dfc-7752abac42d2.png)
+![Transactions](public\transactions.png)
 
 ### Upload
 
-![Upload](./screenshots/b5be94ca-6d01-4521-89eb-15c96d2e89a5.png)
+![Upload](public\upload.png)
 
 ---
 
@@ -264,6 +265,6 @@ src/
 - ✅ Pagination in transaction API.
 - ✅ Multi-user support.
 - 🔄 Budget & savings goal tracking.
-- 🔄 Server-side aggregation for large datasets.
+  datasets.
 
 ---

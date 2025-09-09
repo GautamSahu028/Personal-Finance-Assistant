@@ -2,6 +2,7 @@
 import { Button } from "@/components/transaction/Button";
 import { Card } from "@/components/transaction/Card";
 import { Input } from "@/components/transaction/Input";
+import { LoadingSpinner } from "@/components/transaction/LoadingSpinner";
 import { Select } from "@/components/transaction/Select";
 import { TransactionTable } from "@/components/transaction/TransactionTable";
 import { useEffect, useState } from "react";
@@ -13,6 +14,7 @@ export default function TransactionsPage() {
   const [pageSize] = useState(10);
   const [filters, setFilters] = useState<Filters>({});
   const [loading, setLoading] = useState(false);
+  const [transactionLoading, setTransactionLoading] = useState(true); // New loading state for transactions
   const [error, setError] = useState<string | null>(null);
   const [parseResponse, setParseResponse] = useState<any | null>(null);
   const [importResponse, setImportResponse] = useState<any | null>(null);
@@ -28,11 +30,16 @@ export default function TransactionsPage() {
       params.set("start", new Date(filters.start).toISOString());
     if (filters.end) params.set("end", new Date(filters.end).toISOString());
 
+    setTransactionLoading(true); // Set loading to true before fetch
+
     fetch(`/api/transactions?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => {
         setItems(d.items || []);
         setTotal(d.total || 0);
+      })
+      .finally(() => {
+        setTransactionLoading(false); // Set loading to false after fetch completes
       });
   }, [page, pageSize, filters]);
 
@@ -144,6 +151,31 @@ export default function TransactionsPage() {
 
   const totalPages = Math.ceil(total / pageSize);
 
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-12 px-4">
+      <div className="text-6xl mb-4 text-slate-300">📊</div>
+      <div className="text-center">
+        <h3 className="text-lg font-medium text-slate-900 mb-2">
+          No Transactions Found
+        </h3>
+        <p className="text-sm text-slate-600 mb-4">
+          You haven't added any transactions yet or no transactions match your
+          current filters.
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setFilters({});
+            setPage(1);
+          }}
+          className="px-6"
+        >
+          Clear Filters
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
       {/* Professional Header */}
@@ -164,7 +196,11 @@ export default function TransactionsPage() {
                   Total Records
                 </div>
                 <div className="text-3xl font-bold text-slate-900">
-                  {total.toLocaleString()}
+                  {transactionLoading ? (
+                    <div className="w-8 h-8 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin"></div>
+                  ) : (
+                    total.toLocaleString()
+                  )}
                 </div>
               </div>
             </div>
@@ -220,7 +256,7 @@ export default function TransactionsPage() {
 
                 <div className="pt-4 border-t border-gray-200">
                   <Button type="submit" className="w-full justify-center">
-                    ➕ Add Transaction
+                    Add Transaction
                   </Button>
                 </div>
               </form>
@@ -351,75 +387,88 @@ export default function TransactionsPage() {
             {/* Transactions Table */}
             <Card
               title="Transaction History"
-              subtitle={`Showing ${items.length} of ${total} transactions`}
+              subtitle={
+                transactionLoading
+                  ? "Loading transactions..."
+                  : `Showing ${items.length} of ${total} transactions`
+              }
             >
               <div className="overflow-hidden">
-                <TransactionTable transactions={items} />
+                {transactionLoading ? (
+                  <LoadingSpinner />
+                ) : items.length === 0 ? (
+                  <EmptyState />
+                ) : (
+                  <>
+                    <TransactionTable transactions={items} />
+
+                    {/* Professional Pagination */}
+                    {total > 0 && (
+                      <div className="flex flex-col sm:flex-row justify-between items-center mt-6 pt-6 border-t border-gray-200 space-y-3 sm:space-y-0">
+                        <div className="text-sm text-slate-600">
+                          Showing{" "}
+                          <span className="font-medium">
+                            {Math.min((page - 1) * pageSize + 1, total)}
+                          </span>{" "}
+                          to{" "}
+                          <span className="font-medium">
+                            {Math.min(page * pageSize, total)}
+                          </span>{" "}
+                          of <span className="font-medium">{total}</span>{" "}
+                          results
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page === 1}
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            className="px-3 py-1.5"
+                          >
+                            ← Previous
+                          </Button>
+
+                          <div className="flex items-center space-x-1">
+                            {Array.from(
+                              { length: Math.min(5, totalPages) },
+                              (_, i) => {
+                                const pageNum = i + 1;
+                                return (
+                                  <button
+                                    key={pageNum}
+                                    onClick={() => setPage(pageNum)}
+                                    className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                                      page === pageNum
+                                        ? "bg-blue-600 text-white font-medium"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                );
+                              }
+                            )}
+                            {totalPages > 5 && (
+                              <span className="text-slate-400 px-2">...</span>
+                            )}
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={page >= totalPages}
+                            onClick={() => setPage((p) => p + 1)}
+                            className="px-3 py-1.5"
+                          >
+                            Next →
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-
-              {/* Professional Pagination */}
-              {total > 0 && (
-                <div className="flex flex-col sm:flex-row justify-between items-center mt-6 pt-6 border-t border-gray-200 space-y-3 sm:space-y-0">
-                  <div className="text-sm text-slate-600">
-                    Showing{" "}
-                    <span className="font-medium">
-                      {Math.min((page - 1) * pageSize + 1, total)}
-                    </span>{" "}
-                    to{" "}
-                    <span className="font-medium">
-                      {Math.min(page * pageSize, total)}
-                    </span>{" "}
-                    of <span className="font-medium">{total}</span> results
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page === 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="px-3 py-1.5"
-                    >
-                      ← Previous
-                    </Button>
-
-                    <div className="flex items-center space-x-1">
-                      {Array.from(
-                        { length: Math.min(5, totalPages) },
-                        (_, i) => {
-                          const pageNum = i + 1;
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setPage(pageNum)}
-                              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                                page === pageNum
-                                  ? "bg-blue-600 text-white font-medium"
-                                  : "text-slate-600 hover:bg-slate-100"
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        }
-                      )}
-                      {totalPages > 5 && (
-                        <span className="text-slate-400 px-2">...</span>
-                      )}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                      className="px-3 py-1.5"
-                    >
-                      Next →
-                    </Button>
-                  </div>
-                </div>
-              )}
             </Card>
           </div>
         </div>

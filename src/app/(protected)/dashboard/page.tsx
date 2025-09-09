@@ -300,12 +300,43 @@ export default function DashboardPage() {
           >
             <div className="h-80">
               <Bar
+                // Replace your Bar chart data configuration with this:
                 data={{
-                  labels: dayLabels,
+                  labels: (() => {
+                    // Create sorted array of original dayLabels with their indices
+                    const sortedDayLabels = dayLabels
+                      .map((day, index) => ({ day, index }))
+                      .sort(
+                        (a, b) =>
+                          new Date(a.day).getTime() - new Date(b.day).getTime()
+                      );
+
+                    // Return formatted labels
+                    return sortedDayLabels.map((item) => {
+                      const date = new Date(item.day);
+                      return date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      });
+                    });
+                  })(),
                   datasets: [
                     {
                       label: "Expenses",
-                      data: expenseSeries,
+                      data: (() => {
+                        // Sort data to match the sorted labels
+                        const sortedDayLabels = dayLabels
+                          .map((day, index) => ({ day, index }))
+                          .sort(
+                            (a, b) =>
+                              new Date(a.day).getTime() -
+                              new Date(b.day).getTime()
+                          );
+
+                        return sortedDayLabels.map(
+                          (item) => expenseSeries[item.index]
+                        );
+                      })(),
                       backgroundColor: "rgba(244,63,94,0.7)",
                       borderColor: "#be123c",
                       borderWidth: 1,
@@ -314,7 +345,20 @@ export default function DashboardPage() {
                     },
                     {
                       label: "Income",
-                      data: incomeSeries,
+                      data: (() => {
+                        // Sort data to match the sorted labels
+                        const sortedDayLabels = dayLabels
+                          .map((day, index) => ({ day, index }))
+                          .sort(
+                            (a, b) =>
+                              new Date(a.day).getTime() -
+                              new Date(b.day).getTime()
+                          );
+
+                        return sortedDayLabels.map(
+                          (item) => incomeSeries[item.index]
+                        );
+                      })(),
                       backgroundColor: "rgba(16,185,129,0.7)",
                       borderColor: "#065f46",
                       borderWidth: 1,
@@ -322,53 +366,6 @@ export default function DashboardPage() {
                       borderSkipped: false,
                     },
                   ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: "top" as const,
-                      labels: {
-                        padding: 20,
-                        font: {
-                          size: 13,
-                          weight: 500,
-                          family: "system-ui, sans-serif",
-                        },
-                        color: "#475569",
-                        usePointStyle: true,
-                        pointStyle: "rect",
-                      },
-                    },
-                    tooltip: {
-                      backgroundColor: "rgba(15,23,42,0.9)",
-                      titleColor: "#f1f5f9",
-                      bodyColor: "#f1f5f9",
-                      cornerRadius: 8,
-                      titleFont: { size: 14, weight: 600 },
-                      bodyFont: { size: 13 },
-                    },
-                  },
-                  scales: {
-                    x: {
-                      grid: { display: false },
-                      ticks: {
-                        font: { size: 12, weight: 500 },
-                        color: "#64748b",
-                      },
-                      border: { color: "#e2e8f0" },
-                    },
-                    y: {
-                      grid: { color: "#f1f5f9" },
-                      ticks: {
-                        font: { size: 12, weight: 500 },
-                        color: "#64748b",
-                        callback: (value) => "$" + value,
-                      },
-                      border: { display: false },
-                    },
-                  },
                 }}
               />
             </div>
