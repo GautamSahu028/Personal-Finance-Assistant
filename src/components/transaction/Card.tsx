@@ -9,17 +9,18 @@ export function Card({
   subtitle?: string;
   className?: string;
 }) {
+  const baseClasses =
+    "bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden";
+
   return (
-    <div
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 ${className}`}
-    >
+    <div className={`${baseClasses} ${className}`}>
       {(title || subtitle) && (
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
           {title && (
-            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">{title}</h3>
           )}
           {subtitle && (
-            <p className="text-sm text-slate-600 mt-1">{subtitle}</p>
+            <p className="text-sm text-slate-600 font-medium">{subtitle}</p>
           )}
         </div>
       )}
